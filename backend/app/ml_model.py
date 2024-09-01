@@ -6,58 +6,6 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
-
-
-data=pd.read_csv('youtube.csv',encoding='Latin-1')
-data.head()
-
-
-
-
-data=data.drop(columns=['link'])
-data.head(2)
-
-
-
-
-
-
-# ## Data Preprocessing steps
-#  - lower casing
-#  - \n
-#  - email removal
-#  - twitter handlers (@)
-#  - hashtags
-#  - url removals  
-#  - punctuation Removal
-#  - share,like,comment
-#  - numbers
-#  - tokenization
-#  - emojis
-#  - stopwords removal
-#  - stemming
-#  - lemmatization
-
-# In[11]:
-
-
-import string
-import nltk
-from nltk.tokenize import word_tokenize
-from nltk.stem import PorterStemmer
-from nltk.stem import WordNetLemmatizer
-import re
-
-
-#  - **Lower casing**
-#  - **\n replace with whitespace**
-#  - **email removals**  
-#  - **twitter handlers (@)**
-#  - **hashtags**
-
-# In[12]:
-
-
 def clean_txt_func1(text):
     ## Lower Casing
     text=text.lower()
