@@ -1,8 +1,17 @@
 import uuid
+import pydantic
+from pydantic import EmailStr,BaseModel
 
-from pydantic import EmailStr
 from sqlmodel import Field, Relationship, SQLModel
 
+# Define the input data model
+class PredictionRequest(BaseModel):
+    title: str
+    description: str
+
+# Define the prediction response model
+class PredictionResponse(BaseModel):
+    category: str
 
 # Shared properties
 class UserBase(SQLModel):

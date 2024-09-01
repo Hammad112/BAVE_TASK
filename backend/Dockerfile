@@ -5,7 +5,7 @@ WORKDIR /app/
 RUN pip install pandas
 
 RUN pip install joblib
-RUN pip install scikit-learn
+RUN pip install scikit-learn uvicorn pydantic_settings
 
 # Install Poetry
 RUN curl -sSL https://install.python-poetry.org | POETRY_HOME=/opt/poetry python && \
@@ -32,6 +32,6 @@ COPY ./tests-start.sh /app/
 
 COPY ./app /app/app
 
-COPY ./model.pkl  ./model.pkl
+COPY ./logistic_regression_model.pkl  ./logistic_regression_model.pkl 
 
-COPY ./vectorizer.pkl  ./vectorizer.pkl
+COPY ./tfidf_vectorizer.pkl  ./tfidf_vectorizervectorizer.pkl

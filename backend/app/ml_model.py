@@ -1,575 +1,406 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# ## Importing Dependencies
-
-# In[1]:
 
 
-import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+import numpy as np
+import warnings
+warnings.filterwarnings("ignore")
 
 
-# Reading the dataset
-
-# In[2]:
 
 
-df = pd.read_csv('spam.csv', encoding='latin1')
+data=pd.read_csv('youtube.csv',encoding='Latin-1')
+data.head()
 
 
-# In[3]:
 
 
-df.sample(5)
+data=data.drop(columns=['link'])
+data.head(2)
 
 
-# In[4]:
 
 
-df.shape
 
 
-# In[5]:
-
-
-## our project will composed of the following steps
-# 1. Data Cleaning
-# 2. EDA
-# 3. Text Processing
-# 4. Model Building
-# 5. Evaluation
-# 6. Website
-# 7. Deployment
-
-
-# ### 1. Data Cleaning
-
-# In[6]:
-
-
-df.info()
-
-
-# In[7]:
-
-
-# dropping the last three columns
-df.drop(columns=['Unnamed: 2','Unnamed: 3','Unnamed: 4'],inplace=True)
-
-
-# In[8]:
-
-
-df.head()
-
-
-# In[9]:
-
-
-# renaming the columns
-df.rename(columns={'v1':'target','v2':'text'},inplace=True)
-
-
-# In[10]:
-
-
-# assigning the ham =0 and spam=1
-
-from sklearn.preprocessing import LabelEncoder
-encoder=LabelEncoder()
-
+# ## Data Preprocessing steps
+#  - lower casing
+#  - \n
+#  - email removal
+#  - twitter handlers (@)
+#  - hashtags
+#  - url removals  
+#  - punctuation Removal
+#  - share,like,comment
+#  - numbers
+#  - tokenization
+#  - emojis
+#  - stopwords removal
+#  - stemming
+#  - lemmatization
 
 # In[11]:
 
 
-# labels (0,1) assinged 
-df['target']=encoder.fit_transform(df['target'])
+import string
+import nltk
+from nltk.tokenize import word_tokenize
+from nltk.stem import PorterStemmer
+from nltk.stem import WordNetLemmatizer
+import re
 
+
+#  - **Lower casing**
+#  - **\n replace with whitespace**
+#  - **email removals**  
+#  - **twitter handlers (@)**
+#  - **hashtags**
 
 # In[12]:
 
 
-df.head()
+def clean_txt_func1(text):
+    ## Lower Casing
+    text=text.lower()
+    # \n with whitespace
+    text=text.replace('\n',' ')
+    ## email removal
+    pattern=re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,6}\b')
+    found_urls = pattern.findall(text)
+    for url in found_urls:
+        text = text.replace(url, '')
+    ## hastag removal
+    hashtag_pattern = r"#\w+"
+    text=re.sub(hashtag_pattern, '', text)
+    ## twitter handlers
+    handle_pattern = r'@\w+'
+    text=re.sub(handle_pattern, '', text)
+    return text
+    
 
 
 # In[13]:
 
 
-# missing values
-df.isnull().sum()
+data['description_clean']=data['description'].apply(lambda x : clean_txt_func1(x))
+data['title_clean']=data['title'].apply(lambda x : clean_txt_func1(x))
 
 
 # In[14]:
 
 
-# check duplicate values
-df.duplicated().sum()
+data.head(2)
 
+
+#  - URL Removal
+#  - punctuation Removal
+#  - share,like,comment
+#  - numbers
+#  - tokenization
+
+# ## URL Removals
+# some urls in our data
+#   - http://seek-discomfort.com/yes-theory
+#   - https://www.youtube.com/channel/ucl5d
+# 
+
+# 
+# * - (?:https?://|ftp://|www\.)  # Match various protocols or www. prefix
+#   - [^\s@]+                        # Match URL content (not whitespace or @)
+#   - (?:                             # Optional trailing characters
+#   - [:/?#+&;\w-]*                # Common URL components
+#   -  |                           # or
+#   -  \(                              # Opening parenthesis
+#   -  [^)]*                       # Anything but closing parenthesis
+#   -   \)                          # Closing parenthesis
+#   - )?
+#   - (?:\s|\Z)                       # Match whitespace or end of string
 
 # In[15]:
 
 
-# keeeping the first and dropping the duplicated values
-df = df.drop_duplicates(keep='first')
+import string
+from string import punctuation
 
 
 # In[16]:
 
 
-df.duplicated().sum()     # no duplicate value left
+def clean_txt_func2(text):
+    ## URL Removal
+    reg_pattern = re.compile(r'(?:https?://|ftp://|www\.)[^\s@]+(?:[:/?#+&;\w-]*|\([^)]*\))?(?:\s|\Z)')
+    found_urls = reg_pattern.findall(text)
+    for url in found_urls:
+        text = text.replace(url, '')
+    ## Punctuation Removal
+    text = ''.join([word for word in text if word not in punctuation])
+
+    ## Specific words Removal
+    words_to_remove = ["subscribe","subscribers", "like", "comment", "share","join","disclaimer","’"]
+    pattern = r'\b(' + '|'.join(words_to_remove) + r')\b|\s*\.\s*'
+    text=re.sub(pattern, '', text)
+
+    ## Number Removal
+    pattern = r'\b\d+[a-zA-Z]?\b'
+    text= re.sub(pattern, '', text)
+
+    ## Tokenization
+    text=word_tokenize(text)
+    return text
 
 
 # In[17]:
 
 
-df.shape
+data['description_clean']=data['description_clean'].apply(lambda x : clean_txt_func2(x))
+data['title_clean']=data['title_clean'].apply(lambda x : clean_txt_func2(x))
 
-
-# ### 2. EDA
 
 # In[18]:
 
 
-df.head()
+data.head(4)
 
+
+# ## Emojis Removal
 
 # In[19]:
 
 
-#0=> ham   4516
-#1=> spam   653
+def remove_emojis(text):
+    # Define a pattern that matches emojis
+    emoji_pattern = re.compile(
+        "["
+        "\U0001F600-\U0001F64F"  # Emoticons
+        "\U0001F300-\U0001F5FF"  # Symbols & Pictographs
+        "\U0001F680-\U0001F6FF"  # Transport & Map Symbols
+        "\U0001F1E0-\U0001F1FF"  # Flags (iOS)
+        "\U00002700-\U000027BF"  # Dingbats
+        "\U0001F900-\U0001F9FF"  # Supplemental Symbols and Pictographs
+        "\U0001FA70-\U0001FAFF"  # Symbols and Pictographs Extended-A
+        "\U00002600-\U000026FF"  # Miscellaneous Symbols
+        "\U0001F700-\U0001F77F"  # Alchemical Symbols
+        "\U00002300-\U000023FF"  # Miscellaneous Technical
+        "\U00002000-\U000020FF"  # General Punctuation
+        "\U0001F780-\U0001F7FF"  # Geometric Shapes Extended
+        "\U0001F800-\U0001F8FF"  # Supplemental Arrows-C
+        "\U0001FA00-\U0001FA6F"  # Chess Symbols
+        "\U00002B05-\U00002B07"  # Arrows
+        "\U00002934-\U00002935"  # Arrows
+        "\U00002190-\U000021AA"  # Arrows
+        "]+", flags=re.UNICODE
+    )
 
-df['target'].value_counts()
+    # Substitute emojis with an empty string
+    return emoji_pattern.sub(r'', text)
+
+def clean_txt_func3(word_list):
+    return [remove_emojis(word) for word in word_list if remove_emojis(word).strip()]
 
 
 # In[20]:
 
 
-# for better visualization pie chart is used
+data['description_clean']=data['description_clean'].apply(lambda x: clean_txt_func3(x))
+data['title_clean']=data['title_clean'].apply(lambda x : clean_txt_func3(x))
 
-# autopct=%0.2f is for percentage having 2 decimal point
 
-plt.pie(df['target'].value_counts(), labels=['ham','spam'],autopct="%0.2f")
-plt.show()
-
+# ## Stopwords Removal
 
 # In[21]:
 
 
-# imbalnced data... 87.37% ham and 12.63% spam
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+from nltk.stem import RegexpStemmer
 
+
+# - stopwords removal
+# - stemming
+# - lemmatization
 
 # In[22]:
 
 
-import nltk
+def clean_txt_func4(text):
+    ## Stopwords Removal
+    stopwords=nltk.corpus.stopwords.words('english')
+    text=[word for word in text if word not in stopwords]
+    
+    ## Stemming
+    # Create a Regexp Stemmer with a custom rule
+    custom_rule = r'ing$'
+    regexp_stemmer = RegexpStemmer(custom_rule)
+    text = [regexp_stemmer.stem(word) for word in text]
+    
+    ## Lemaatize
+    lm=WordNetLemmatizer()
+    text = [lm.lemmatize(word) for word in text ]
+
+    return text    
 
 
 # In[23]:
 
 
-nltk.download('punkt')
+data['description_clean']=data['description_clean'].apply(lambda x: clean_txt_func4(x))
+data['title_clean']=data['title_clean'].apply(lambda x : clean_txt_func4(x))
 
-
-# We will create three extra column. For counting the no. of characters, no. of words, no. of words in the message/email.
 
 # In[24]:
 
 
-df['num_characters']=df['text'].apply(len)     # gives the number of characters as length
+data.head(3)
 
 
 # In[25]:
 
 
-df.head()
+data.drop(columns=['title','description'],inplace=True)
 
 
 # In[26]:
 
 
-# number of words in a message
-df['num_words']=df['text'].apply(lambda x:len(nltk.word_tokenize(x)))
+data.head(3)
 
+
+# ## Label Encoding on Category Column
 
 # In[27]:
 
 
-df.head()
+from sklearn.preprocessing import OrdinalEncoder
 
 
 # In[28]:
 
 
-# number of sentence in a message
-df['num_sentence']=df['text'].apply(lambda x:len(nltk.sent_tokenize(x)))
+categories_order = [['travel', 'food', 'art_music','history']]
+# Initialize the OrdinalEncoder with the specified order
+ordinal_encoder = OrdinalEncoder(categories=categories_order)
+
+# Fit and transform the categorical data
+data['category_encoded'] = ordinal_encoder.fit_transform(data[['category']])
 
 
 # In[29]:
 
 
-df.head()
+data.head(2)
 
 
 # In[30]:
 
 
-df[['num_characters','num_words','num_sentence']].describe()
+data['combined']=data['title_clean']+data['description_clean']
 
+
+# ## Data Splitting
 
 # In[31]:
 
 
-# ham message descritption
-df[df['target']==0][['num_characters','num_words','num_sentence']].describe()
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(data['combined'],data['category'], test_size=0.2, random_state=42)
 
 
 # In[32]:
 
 
-# spam message descritption
-df[df['target']==1][['num_characters','num_words','num_sentence']].describe()
+y_train.value_counts()
 
+
+# ## Vectorization
 
 # In[33]:
 
 
-import seaborn as sns
+from sklearn.feature_extraction.text import TfidfVectorizer
+
 
 
 # In[34]:
+tfidf = TfidfVectorizer()
 
-
-#plt.figure(figsize=(12,6))
-sns.histplot(df[df['target']==0]['num_characters'])
-sns.histplot(df[df['target']==1]['num_characters'],color='red')
+def tfidf_vectorization(X_train, X_test):
+    # Join tokens into a single string for each document
+    X_train_joined = [' '.join(tokens) for tokens in X_train]
+    X_test_joined = [' '.join(tokens) for tokens in X_test]
+    # Perform TF-IDF vectorization
+    X_train_tfidf = tfidf.fit_transform(X_train_joined)
+    X_test_tfidf = tfidf.transform(X_test_joined)
+    
+    return X_train_tfidf, X_test_tfidf
 
 
 # In[35]:
 
 
-#plt.figure(figsize=(12,6))
-sns.histplot(df[df['target']==0]['num_words'])
-sns.histplot(df[df['target']==1]['num_words'],color='red')
+X_train_vec_tfidf, X_test_vec_tfidf=tfidf_vectorization (X_train, X_test)
+X_train_vec_tfidf=X_train_vec_tfidf.toarray()
+X_test_vec_tfidf=X_test_vec_tfidf.toarray()
 
+
+# ## Class Balancing Using SMOTE
 
 # In[36]:
 
 
-#plt.figure(figsize=(12,6))
-sns.histplot(df[df['target']==0]['num_sentence'])
-sns.histplot(df[df['target']==1]['num_sentence'],color='red')
-
-
-# In[37]:
-
-
-sns.pairplot(df,hue='target')
-
-
-# In[38]:
-
-
-# Select only numeric columns
-numeric_df = df.select_dtypes(include=[np.number])
-
-# Calculate the correlation matrix
-numeric_df.corr()
-
-
-
-# In[39]:
-
-
-sns.heatmap(numeric_df.corr(),annot=True)
-
-
-# ### 3. Data Preprocessing
-# - Lower Case
-# - Tokenization
-# - Removing Special  Characters
-# - Removing stop words and punctuation
-# - Stemming
-# 
-
-# In[40]:
-
-
-import string                         # for punctuation
-from nltk.corpus import stopwords    
-from nltk.stem.porter import PorterStemmer
-
-
-# In[41]:
-
-
-ps= PorterStemmer()
-
-
-# ### Text Transformation Function
-# 
-# The `transform_text` function processes a given text string by performing several text preprocessing steps:
-# 
-# 1. **Convert to Lowercase**: Transforms all characters in the text to lowercase.
-# 2. **Tokenization**: Splits the text into individual words.
-# 3. **Remove Non-Alphanumeric Characters**: Filters out any special characters, keeping only alphanumeric words.
-# 4. **Remove Stopwords and Punctuation**: Eliminates common English stopwords and punctuation.
-# 5. **Stemming**: Reduces words to their root form (e.g., "dancing" to "danc" and "loving" to "love").
-# 
-# The function returns the processed text as a single string, ready for further natural language processing tasks.
-# 
-
-# In[42]:
-
-
-def transform_text(text):
-    text = text.lower()
-    # breaking into separate words
-    text = nltk.word_tokenize(text)
-    
-    # as text is converted to list after tokenization- so useing loop
-    y=[]
-    for i in text:
-        if i.isalnum():   # just include alphanumeric- remove special characters
-            y.append(i)
-            
-    text=y[:]   # removing stopwords and punctuation
-    y.clear()
-    
-    for i in text:
-        if i not in stopwords.words("english") and i not in string.punctuation:
-            y.append(i)
-            
-    text=y[:]    # stemming  dancing-> danc, loving-> love
-    y.clear()
-    
-    for i in text:
-        y.append(ps.stem(i))
-    
-    return " ".join(y)
-
-
-# In[43]:
-
-
-transform_text("Did you like my presentation in Machine lEarning")
-
-
-# In[44]:
-
-
-df["transformed_text"]=df["text"].apply(transform_text)
-
-
-# In[45]:
-
-
-df.head()
-
-
-# Creating the **word clouds** for the spam and ham msgs. Using the target column and the tranformed text for this word cloud.
-
-# In[46]:
-
-
-# generating the word cloud for spam msgs
-from wordcloud import WordCloud
-wc=WordCloud(width=500,height=500,min_font_size=10,background_color='white')
-
-
-# In[47]:
-
-
-spam_wc=wc.generate(df[df['target']==1]['transformed_text'].str.cat(sep=" "))
-
-
-# In[48]:
-
-
-plt.figure(figsize=(15,6))
-plt.imshow(spam_wc)
-
-
-# In[49]:
-
-
-# generating the word cloud for ham msgs
-ham_wc = wc.generate(df[df['target'] == 0]['transformed_text'].str.cat(sep=" "))
-
-
-# In[50]:
-
-
-plt.figure(figsize=(15,6))
-plt.imshow(ham_wc)
-
-
-# In[51]:
-
-
-spam_corpus = []
-for msg in df[df['target'] == 1]['transformed_text'].tolist():
-    for word in msg.split():
-        spam_corpus.append(word)
-
-
-# In[52]:
-
-
-len(spam_corpus)
-
-
-# In[53]:
-
-
-from collections import Counter
-common_words = Counter(spam_corpus).most_common(30)
-
-# Convert to DataFrame
-df_common_words = pd.DataFrame(common_words, columns=['word', 'count'])
-
-# Create the barplot
-sns.barplot(x='word', y='count', data=df_common_words)
-plt.xticks(rotation='vertical')
-plt.show()
-
-
-# In[54]:
-
-
-ham_corpus = []
-for msg in df[df['target'] == 0]['transformed_text'].tolist():
-    for word in msg.split():
-        ham_corpus.append(word)
-
-
-# In[55]:
-
-
-len(ham_corpus)
-
-
-# In[56]:
-
-
-from collections import Counter
-common_words = Counter(ham_corpus).most_common(30)
-
-# Convert to DataFrame
-df_common_words = pd.DataFrame(common_words, columns=['word', 'count'])
-
-# Create the barplot
-sns.barplot(x='word', y='count', data=df_common_words)
-plt.xticks(rotation='vertical')
-plt.show()
-
-
-# ## 4. Model Building
-
-# In[57]:
-
-
-from sklearn.feature_extraction.text import CountVectorizer,TfidfVectorizer
-cv = CountVectorizer()
-tfidf = TfidfVectorizer(max_features=3000)
-
-
-# In[58]:
-
-
-#X = cv.fit_transform(df['transformed_text']).toarray()
-X = tfidf.fit_transform(df['transformed_text']).toarray()
-
-
-# In[59]:
-
-
-X.shape
-
-
-# In[60]:
-
-
-y = df['target'].values
-
-
-# In[61]:
-
-
-from sklearn.model_selection import train_test_split
-X_train,X_test,y_train,y_test = train_test_split(X,y,test_size=0.2,random_state=2)
-
-
-# We will use different navie's byes ML algorithm beacuse in order to know the data distribution. So using three of them and to observe the accuracy and precision for all. 
-
-# In[62]:
-
-
-from sklearn.naive_bayes import GaussianNB,MultinomialNB,BernoulliNB
-from sklearn.metrics import accuracy_score,confusion_matrix,precision_score
-
-
-# In[63]:
-
-
-gnb = GaussianNB()
-mnb = MultinomialNB()
-bnb = BernoulliNB()
-
-
-# **Guassion Naive Bayes**
-
-# In[64]:
-
-
-gnb.fit(X_train,y_train)
-y_pred1 = gnb.predict(X_test)
-print(accuracy_score(y_test,y_pred1))
-print(confusion_matrix(y_test,y_pred1))
-print(precision_score(y_test,y_pred1))
-
-
-# **Multi-nomial Naive Bayes**
-
-# In[65]:
-
-
-mnb.fit(X_train,y_train)
-y_pred2 = mnb.predict(X_test)
-print(accuracy_score(y_test,y_pred2))
-print(confusion_matrix(y_test,y_pred2))
-print(precision_score(y_test,y_pred2))
-
-
-# **Bernoulli Naive Bayes**
-
-# In[66]:
-
-
-bnb.fit(X_train,y_train)
-y_pred3 = bnb.predict(X_test)
-print(accuracy_score(y_test,y_pred3))
-print(confusion_matrix(y_test,y_pred3))
-print(precision_score(y_test,y_pred3))
-
-
-# - due to good precision of multinomial naive bayes we will use multinomial naive bayes with tfidfVectorizer 
-
-# ## 5. Pickling the files for the model deployment
-
-# As our multinomial naive bayes gives us good accuracy and precision so files from this model will be pickled.
-
-# In[68]:
-
-
-import pickle
-pickle.dump(tfidf,open('vectorizer.pkl','wb'))
-pickle.dump(mnb,open('model.pkl','wb'))
+from imblearn.over_sampling import SMOTE
+
+def apply_smote(X_train, y_train):
+    smote = SMOTE(random_state=42)
+    X_train_res, y_train_res = smote.fit_resample(X_train, y_train)
+    return X_train_res, y_train_res
 
 
 # In[ ]:
+
+
+X_train_tfidf_res, y_train_res = apply_smote(X_train_vec_tfidf, y_train)
+
+
+# In[ ]:
+
+
+y_train_res.value_counts()
+
+
+# ## Model
+
+# In[ ]:
+
+
+from sklearn.linear_model import LogisticRegression
+
+models = {
+        "Logistic Regression": LogisticRegression(C=10, random_state=42)
+    }
+
+
+def evaluate_svm(X_train, X_test, y_train, y_test):
+   
+    for model_name, model in models.items():
+        model.fit(X_train, y_train)
+        y_pred = model.predict(X_test)
+
+       
+
+
+
+
+
+evaluate_svm(X_train_tfidf_res, X_test_vec_tfidf, y_train_res, y_test)
+
+
+import joblib
+
+# Save the trained model
+joblib.dump(models['Logistic Regression'], 'logistic_regression_model.pkl')
+
+# Save the TF-IDF vectorizer
+joblib.dump(tfidf, 'tfidf_vectorizer.pkl')
+
 
 
 
